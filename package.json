@@ -4,10 +4,8 @@
   "main": "index.js",
   "license": "MIT",
   "dependencies": {
-    "@fastify/autoload": "^5.8.0",
-    "@fastify/cors": "^8.5.0",
-    "bitcoinjs-lib": "^6.1.5",
-    "consola": "^3.2.3",
-    "json5": "^2.2.3"
+    "bdb": "^1.5.1",
+    "bufio": "^1.2.1",
+    "bweb": "^0.3.0"
   }
 }

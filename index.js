@@ -1,58 +1,95 @@
-// const lmdb = require("lmdb");
-const JSON5 = require("json5");
-const autoLoad = require("@fastify/autoload");
-const fastifyCors = require("@fastify/cors");
-const app = require("fastify")({ logger: false });
+const bcoin = require("./bcoin");
+const bweb = require("bweb");
+const bdb = require("bdb");
 const fs = require("fs");
-const bitcoin = require("bitcoinjs-lib");
+const path = require("path");
 
 (async () => {
-  global.config = JSON5.parse(fs.readFileSync("./config.json5", "utf8"));
-  global.bitcoin = bitcoin;
-  //   global.databases = {
-  //     transactions: lmdb.open("./db/transactions"),
-  //   };
+  const dbDir = path.resolve(__dirname, "./db");
+  if (!fs.existsSync(dbDir)) {
+    fs.mkdirSync(dbDir, { recursive: true });
+  }
 
-  let startSyncLoop = require("./syncer.js");
+  global.config = JSON.parse(fs.readFileSync("./config.json", "utf8"));
+  global.node = new bcoin.FullNode({
+    prefix: "~/.bcon-sequencer-chain",
+    file: true,
+    "max-files": 256,
+    argv: true,
+    env: true,
+    logFile: true,
+    // logConsole: true,
+    // logLevel: "info",
+    "max-outbound": 12,
+    memory: false,
+    network: global.config.network,
+    prune: true,
+    workers: true,
+    listen: true,
+    loader: require,
+  });
+  global.block = 0;
+  global.databases = {
+    transactions: bdb.create(path.join(dbDir, "transactions.db")),
+    bundles: bdb.create(path.join(dbDir, "bundles.db")),
+  };
+  global.mempool = [];
 
-  await startSyncLoop();
+  await global.databases.transactions.open();
+  await global.databases.bundles.open();
+
+  await node.open();
+  await node.connect();
+  node.startSync();
+
+  node.chain.on("connect", require("./events/block"));
+  node.chain.on("disconnect", require("./events/reorg"));
 })();
 
 const start = async () => {
-  app.addHook("preHandler", (req, res, done) => {
-    res.header("Access-Control-Allow-Origin", "*");
-    res.header("Access-Control-Allow-Methods", "*");
-    res.header("Access-Control-Allow-Headers", "*");
-    const isPreflight = /options/i.test(req.method);
-    if (isPreflight) {
-      return res.send();
+  const server = bweb.server({
+    port: global.config.port,
+    sockets: true,
+  });
+
+  server.use(async (req, res, next) => {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Access-Control-Allow-Methods", "*");
+    res.setHeader("Access-Control-Allow-Headers", "*");
+    if (req.method === "OPTIONS") {
+      return res.send(200);
     }
-    done();
+    await next();
   });
-  app.register(fastifyCors, {
-    origin: "*",
-    methods: ["GET"],
-  });
-  app.addContentTypeParser(
-    "application/octet-stream",
-    function (request, payload, done) {
+
+  server.use(server.bodyParser());
+  server.use(server.router());
+
+  server.use(async (req, res, next) => {
+    if (req.headers["content-type"] === "application/octet-stream") {
       let data = Buffer.alloc(0);
-      payload.on("data", (chunk) => {
+      req.on("data", (chunk) => {
         if (chunk.length + data.length >= 1e8) {
-          throw "Too big payload";
+          throw new Error("Too big payload");
         }
         data = Buffer.concat([data, chunk]);
       });
-      payload.on("end", () => {
-        done(null, data);
+      req.on("end", () => {
+        req.body = data;
+        next();
       });
+    } else {
+      await next();
     }
-  );
-  app.register(autoLoad, {
-    dir: require("path").join(__dirname, "routes"),
   });
+
+  fs.readdirSync(path.join(__dirname, "routes")).forEach((file) => {
+    const route = require(path.join(path.join(__dirname, "routes"), file));
+    route(server);
+  });
+
   try {
-    await app.listen({ port: global.config.port });
+    await server.open();
   } catch (err) {
     console.log(err);
     app.log.error(err);
