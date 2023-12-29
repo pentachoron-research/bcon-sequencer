@@ -1,39 +1,24 @@
-const bio = require("bufio");
+const cbor = require("cbor");
 
-class Bundle extends bio.Struct {
+class Bundle {
   constructor(parentBundle, txids) {
-    super();
     this.parentBundle = parentBundle || "";
     this.txids = txids || [];
   }
 
-  getSize() {
-    let size = 0;
-    size += bio.sizeVarString(this.parentBundle, "utf8");
-    size += bio.sizeVarint(this.txids.length);
-    for (const txid of this.txids) {
-      size += bio.sizeVarString(txid, "utf8");
-    }
-    return size;
+  encode() {
+    return cbor.encode({
+      parentBundle: this.parentBundle,
+      txids: this.txids,
+    });
   }
 
-  write(bw) {
-    bw.writeVarString(this.parentBundle, "utf8");
-    bw.writeVarint(this.txids.length);
-    for (const txid of this.txids) {
-      bw.writeVarString(txid, "utf8");
-    }
-    return this;
-  }
-
-  read(br) {
-    this.parentBundle = br.readVarString("utf8");
-    const txidCount = br.readVarint();
-    this.txids = [];
-    for (let i = 0; i < txidCount; i++) {
-      this.txids.push(br.readVarString("utf8"));
-    }
-    return this;
+  static decode(buffer) {
+    const decodedObject = cbor.decodeFirstSync(buffer);
+    return {
+      parentBundle: decodedObject.parentBundle,
+      txids: decodedObject.txids,
+    };
   }
 }
 

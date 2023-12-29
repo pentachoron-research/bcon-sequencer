@@ -28,22 +28,53 @@ const path = require("path");
     listen: true,
     loader: require,
   });
-  global.block = 0;
   global.databases = {
     transactions: bdb.create(path.join(dbDir, "transactions.db")),
     bundles: bdb.create(path.join(dbDir, "bundles.db")),
+    bundleNumbers: bdb.create(path.join(dbDir, "bundleNums.db")),
+    pendingBundles: bdb.create(path.join(dbDir, "pendingBundles.db")),
+    mempool: bdb.create(path.join(dbDir, "mempool.db")),
   };
-  global.mempool = [];
+  global.block = 0;
+
+  /*
+    Bundles are made every 5 blocks however when the node is syncing it will spam blocks
+    (AFAIK bcoin doesnt have a fully synced event that i could get working)
+
+    so this is kinda a hacky way to not make bundles when syncing
+  */
+  global.lastBlockTime = Date.now();
+  global.blockCounter = 0;
+  global.blockResetThreshold = 60000;
 
   await global.databases.transactions.open();
   await global.databases.bundles.open();
+  await global.databases.bundleNumbers.open();
+  await global.databases.pendingBundles.open();
+  await global.databases.mempool.open();
 
   await node.open();
   await node.connect();
   node.startSync();
 
+  let startSyncLoop = require("./syncer.js");
+
+  startSyncLoop();
+
   node.chain.on("connect", require("./events/block"));
   node.chain.on("disconnect", require("./events/reorg"));
+
+  console.log(
+    new bcoin.Output()
+      .fromScript(
+        new bcoin.Script().fromAddress(
+          "tb1p0wt007yyzfswhsnwnc45ly9ktyefzyrwznwja0m4gr7n9vjactes80klh4"
+        ),
+        1
+      )
+      .getAddress()
+      .toString("testnet")
+  );
 })();
 
 const start = async () => {
@@ -64,24 +95,6 @@ const start = async () => {
 
   server.use(server.bodyParser());
   server.use(server.router());
-
-  server.use(async (req, res, next) => {
-    if (req.headers["content-type"] === "application/octet-stream") {
-      let data = Buffer.alloc(0);
-      req.on("data", (chunk) => {
-        if (chunk.length + data.length >= 1e8) {
-          throw new Error("Too big payload");
-        }
-        data = Buffer.concat([data, chunk]);
-      });
-      req.on("end", () => {
-        req.body = data;
-        next();
-      });
-    } else {
-      await next();
-    }
-  });
 
   fs.readdirSync(path.join(__dirname, "routes")).forEach((file) => {
     const route = require(path.join(path.join(__dirname, "routes"), file));

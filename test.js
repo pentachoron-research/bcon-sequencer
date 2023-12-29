@@ -8,5 +8,6 @@
   const db = bdb.create("db/transactions.db");
   await db.open();
 
-  await db.put("txHash", "tx");
+  await db.put(Buffer.from("txHash"), Buffer.from("txxxx"));
+  console.log((await db.get(Buffer.from("txHash"))).toString());
 })();
