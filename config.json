@@ -1,4 +1,5 @@
 {
+  "privateKey": "privkey",
   "network": "testnet",
   "port": 2880
 }
