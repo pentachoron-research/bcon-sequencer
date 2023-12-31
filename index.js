@@ -45,7 +45,7 @@ const path = require("path");
   */
   global.lastBlockTime = Date.now();
   global.blockCounter = 0;
-  global.blockResetThreshold = 60000;
+  global.blockResetThreshold = 45000;
 
   await global.databases.transactions.open();
   await global.databases.bundles.open();
@@ -56,10 +56,6 @@ const path = require("path");
   await node.open();
   await node.connect();
   node.startSync();
-
-  let startSyncLoop = require("./syncer.js");
-
-  startSyncLoop();
 
   node.chain.on("connect", require("./events/block"));
   node.chain.on("disconnect", require("./events/reorg"));

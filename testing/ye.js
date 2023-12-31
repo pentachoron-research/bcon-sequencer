@@ -6,7 +6,7 @@ const bitcoin = require("bitcoinjs-lib");
 
 (async () => {
   try {
-    const privateKey = "cPMB77TJ2CgHdv3dfyba5AhUjCeSBrpyGdJcnJZzsAMj85db9HoB";
+    const privateKey = "t";
     const address =
       "tb1p0wt007yyzfswhsnwnc45ly9ktyefzyrwznwja0m4gr7n9vjactes80klh4";
 
@@ -26,6 +26,7 @@ const bitcoin = require("bitcoinjs-lib");
 
     const newTx = new BconTx({
       address: "tb1p0wt007yyzfswhsnwnc45ly9ktyefzyrwznwja0m4gr7n9vjactes80klh4",
+      nonce: 1,
       signature,
       input,
     });
@@ -38,8 +39,8 @@ const bitcoin = require("bitcoinjs-lib");
       headers: { "Content-Type": "text/plain" },
     });
 
-    // console.log("Transaction ID:", response.data);
+    console.log("Transaction ID:", response.data);
   } catch (error) {
-    // console.error("Error broadcasting transaction:", error);
+    console.error("Error broadcasting transaction:", error);
   }
 })();

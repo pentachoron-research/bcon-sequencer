@@ -1,14 +1,36 @@
 const blake2s = require("bcrypto/lib/blake2s");
 const { Bundle } = require("../structs/bundle");
+const { uploadHash } = require("../helpers/uploadHash.js");
 
 module.exports = async (chainEntry, block) => {
-  console.log(global.blockCounter);
+  for (const tx of block.txs) {
+    // Runs when a bundle has been confirmed on chain
+    let bundleHash = tx.hash().toString("hex");
+    let encodedBundle = await global.databases.pendingBundles.get(
+      Buffer.from(bundleHash)
+    );
+
+    if (encodedBundle) {
+      console.log(encodedBundle);
+      console.log(encodedBundle.toString());
+
+      console.log(Bundle.decode(encodedBundle));
+      let bundleHash = blake2s.digest(encodedBundle, 32).toString("base64");
+      console.log(bundleHash);
+
+      await global.databases.bundles.put(
+        Buffer.from(bundleHash),
+        Buffer.from(encodedBundle)
+      );
+
+      await global.databases.pendingBundles.del(Buffer.from(bundleHash));
+    }
+  }
   const now = Date.now();
   if (now - global.lastBlockTime > global.blockResetThreshold) {
     global.blockCounter++;
-
-    if (global.blockCounter === 5) {
-      console.log("test");
+    console.log(global.blockCounter);
+    if (global.blockCounter === 1) {
       await uploadBundle();
       blockCounter = 0;
     }
@@ -22,7 +44,7 @@ module.exports = async (chainEntry, block) => {
 async function uploadBundle() {
   try {
     let bundleCount = await amountOfBundles();
-    let bundle = await createBundle();
+    let bundle = await createBundle(bundleCount);
     let txs = bundle.txids;
 
     if (txs.length <= 0) {
@@ -37,8 +59,10 @@ async function uploadBundle() {
 
     await deleteMempool();
 
+    let uploadedBundleHash = await uploadHash(hash);
+
     await global.databases.pendingBundles.put(
-      Buffer.from(hash),
+      Buffer.from(uploadedBundleHash),
       Buffer.from(encodedBundle)
     );
 
@@ -53,12 +77,16 @@ async function uploadBundle() {
   console.log("Bundle Uploaded");
 }
 
-async function createBundle() {
+async function createBundle(amount) {
   let txs = await getMempool();
 
-  console.log(txs);
+  const parentBundleId = amount
+    ? await global.databases.bundleNumbers.get(Buffer.from(amount.toString()))
+    : "first";
 
-  const bundle = new Bundle("parentBundleId", txs);
+  console.log(parentBundleId.toString());
+
+  const bundle = new Bundle(parentBundleId.toString(), txs);
 
   return bundle;
 }
@@ -76,6 +104,7 @@ async function getMempool() {
     mempool.push(key.toString());
   }
 
+  console.log(mempool);
   return mempool;
 }
 
@@ -100,6 +129,6 @@ async function deleteMempool() {
   });
 
   for await (const { key, value } of asyncIter) {
-    global.databases.mempool.remove(key);
+    global.databases.mempool.del(key);
   }
 }
