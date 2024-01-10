@@ -1,20 +1,23 @@
+// TODO: Fix network and make it depend on config. Need to set network in bcoin inside function somehow
 const bcoin = require("../bcoin").set("testnet");
+const FEE = 250;
+const NETWORK_TYPE = "testnet";
+const { base58 } = require("bstring");
 
 async function uploadHash(hash) {
   const mtx = new bcoin.MTX();
-  const network = bcoin.Network.get("testnet");
+  const network = bcoin.Network.get(NETWORK_TYPE);
   const keyring = bcoin.KeyRing.fromSecret(global.config.privateKey, network);
   let utxos = await waitUntilUTXO(keyring.getAddress("string"));
 
-  const pubKeyHash = keyring.getKeyHash();
-  const script = bcoin.Script.fromPubkeyhash(pubKeyHash);
-  const scriptHex = script.toRaw().toString("hex");
   utxos.forEach((utxo) => {
     const coin = bcoin.Coin.fromJSON({
       version: 1,
       height: -1,
       value: utxo.value,
-      script: scriptHex,
+      script: bcoin.Script.fromPubkeyhash(keyring.getKeyHash())
+        .toRaw()
+        .toString("hex"),
       coinbase: false,
       hash: utxo.txid,
       index: utxo.vout,
@@ -22,27 +25,30 @@ async function uploadHash(hash) {
     mtx.addCoin(coin);
   });
 
-  const outputAddress = keyring.getAddress("string");
-  const fee = 250;
   const totalValue = utxos.reduce((acc, utxo) => acc + utxo.value, 0);
-  const changeValue = totalValue - fee;
+  const changeValue = totalValue - FEE;
 
-  const memoData = Buffer.from(hash, "utf8");
-  const memoScript = bcoin.Script.fromNulldata(memoData);
-
-  mtx.addOutput(outputAddress, changeValue);
-  mtx.addOutput(memoScript, 0);
+  mtx.addOutput(keyring.getAddress("string"), changeValue);
+  console.log("Hash that we try to upload:", hash);
+  console.log("Bytelength of hash:", hash.length);
+  mtx.addOutput(bcoin.Output.fromScript(bcoin.Script.fromNulldata(hash), 0));
 
   mtx.sign(keyring);
 
   const tx = mtx.toTX();
 
-  // Send the transaction
   try {
-    const result = await global.node.broadcast(tx);
-    return tx.hash("hex");
+    console.log("Uploading bundle...");
+    await global.node.broadcast(tx);
+    console.log(
+      "Uploaded bundle!\nBtc txid:",
+      tx.txid("hex"),
+      "\nBundle hash: ",
+      base58.encode(hash)
+    );
+    return tx.txid("hex");
   } catch (e) {
-    console.error(e);
+    console.error("ERROR!!", e);
     throw e;
   }
 }
@@ -52,17 +58,9 @@ async function waitUntilUTXO(address) {
     let intervalId;
     const checkForUtxo = async () => {
       try {
-        let response;
-        if (global.config.network === "testnet") {
-          response = await fetch(
-            `https://mempool.space/testnet/api/address/${address}/utxo`
-          );
-        } else {
-          response = await fetch(
-            `https://mempool.space/api/address/${address}/utxo`
-          );
-        }
-
+        const response = await fetch(
+          `https://mempool.space/${NETWORK_TYPE}/api/address/${address}/utxo`
+        );
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }

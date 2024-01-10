@@ -1,11 +1,11 @@
 const cbor = require("cbor");
 const crypto = require("crypto");
-
+const { base58 } = require("bstring");
 class BconTx {
-  constructor({ address, signature, contractId, input, maxGas, fee }) {
+  constructor({ address, signature, contractId, input, maxGas, fee, nonce }) {
     this.address = address || "";
     this.signature = signature || "";
-    this.nonce = crypto.randomBytes(4).readUInt32BE(0);
+    this.nonce = nonce || crypto.randomBytes(4).readUInt32BE(0);
     this.maxGas = maxGas || "0";
     this.fee = fee || "0";
     this.contractId = contractId || "0".repeat(32);
@@ -13,7 +13,8 @@ class BconTx {
   }
 
   encode() {
-    return cbor
+
+    return base58.encode(cbor
       .encode({
         address: this.address,
         signature: this.signature,
@@ -22,12 +23,13 @@ class BconTx {
         fee: this.fee,
         contractId: this.contractId,
         input: cbor.encode(this.input),
-      })
-      .toString("hex");
+      }))
+      
   }
 
-  static decode(hexString) {
-    const buffer = Buffer.from(hexString, "hex");
+  static decode(base58encoded) {
+ 
+    const buffer = base58.decode(base58encoded);
     const decodedObject = cbor.decodeFirstSync(buffer);
     return {
       address: decodedObject.address,
@@ -36,6 +38,7 @@ class BconTx {
       input: cbor.decode(decodedObject.input),
       maxGas: decodedObject.maxGas,
       fee: decodedObject.fee,
+      nonce: decodedObject.nonce,
     };
   }
 }

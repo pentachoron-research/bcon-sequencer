@@ -9,7 +9,7 @@ const path = require("path");
   if (!fs.existsSync(dbDir)) {
     fs.mkdirSync(dbDir, { recursive: true });
   }
-
+  bcoin.set("testnet");
   global.config = JSON.parse(fs.readFileSync("./config.json", "utf8"));
   global.node = new bcoin.FullNode({
     prefix: "~/.bcon-sequencer-chain",
@@ -28,7 +28,9 @@ const path = require("path");
     listen: true,
     loader: require,
   });
+
   global.databases = {
+    allContent: bdb.create(path.join(dbDir, "allContent.db")),
     transactions: bdb.create(path.join(dbDir, "transactions.db")),
     bundles: bdb.create(path.join(dbDir, "bundles.db")),
     bundleNumbers: bdb.create(path.join(dbDir, "bundleNums.db")),
@@ -47,6 +49,7 @@ const path = require("path");
   global.blockCounter = 0;
   global.blockResetThreshold = 45000;
 
+  await global.databases.allContent.open();
   await global.databases.transactions.open();
   await global.databases.bundles.open();
   await global.databases.bundleNumbers.open();
@@ -57,24 +60,14 @@ const path = require("path");
   await node.connect();
   node.startSync();
 
+  // Handles bundle making
   node.chain.on("connect", require("./events/block"));
   node.chain.on("disconnect", require("./events/reorg"));
-
-  console.log(
-    new bcoin.Output()
-      .fromScript(
-        new bcoin.Script().fromAddress(
-          "tb1p0wt007yyzfswhsnwnc45ly9ktyefzyrwznwja0m4gr7n9vjactes80klh4"
-        ),
-        1
-      )
-      .getAddress()
-      .toString("testnet")
-  );
 })();
 
 const start = async () => {
   const server = bweb.server({
+    host:"0.0.0.0",
     port: global.config.port,
     sockets: true,
   });

@@ -1,5 +1,5 @@
 const cbor = require("cbor");
-
+const { base58 } = require("bstring");
 class Bundle {
   constructor(parentBundle, txids) {
     this.parentBundle = parentBundle || "";
@@ -7,13 +7,16 @@ class Bundle {
   }
 
   encode() {
-    return cbor.encode({
-      parentBundle: this.parentBundle,
-      txids: this.txids,
-    });
+    return base58.encode(cbor
+      .encode({
+        parentBundle: this.parentBundle,
+        txids: this.txids,
+      }))
+      ;
   }
 
-  static decode(buffer) {
+  static decode(base58encoded) {
+    const buffer = base58.decode(base58encoded);
     const decodedObject = cbor.decodeFirstSync(buffer);
     return {
       parentBundle: decodedObject.parentBundle,

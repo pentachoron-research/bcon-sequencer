@@ -1,6 +1,9 @@
 {
   "name": "bcon-sequencer",
   "version": "0.0.1",
+  "scripts": {
+    "run:debug": "nodemon . --trace-warnings --no-colors --ignore ./testing &> log.txt"
+  },
   "main": "index.js",
   "license": "MIT",
   "dependencies": {
@@ -10,6 +13,7 @@
     "bip322-js": "^1.1.0",
     "bitcoin": "^3.0.3",
     "bitcoinjs-lib": "^6.1.5",
+    "bstring": "^0.3.9",
     "bweb": "^0.3.0",
     "cbor": "^9.0.1",
     "ecpair": "^2.1.0",
