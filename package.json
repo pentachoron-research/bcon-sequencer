@@ -13,10 +13,13 @@
     "bip322-js": "^1.1.0",
     "bitcoin": "^3.0.3",
     "bitcoinjs-lib": "^6.1.5",
+    "bsock": "^0.1.11",
     "bstring": "^0.3.9",
     "bweb": "^0.3.0",
     "cbor": "^9.0.1",
     "ecpair": "^2.1.0",
-    "tiny-secp256k1": "^2.2.3"
+    "faye-websocket": "^0.11.4",
+    "tiny-secp256k1": "^2.2.3",
+    "ws": "^8.16.0"
   }
 }

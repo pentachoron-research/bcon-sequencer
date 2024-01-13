@@ -2,3 +2,5 @@ node_modules/
 db/
 yarn-error.log
 bcoin/
+.env
+.secret/

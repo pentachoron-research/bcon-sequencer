@@ -1,6 +1,8 @@
 const bcoin = require("./bcoin");
 const bweb = require("bweb");
 const bdb = require("bdb");
+const WebSocket = require("faye-websocket");
+const http = require("http");
 const fs = require("fs");
 const path = require("path");
 
@@ -28,7 +30,6 @@ const path = require("path");
     listen: true,
     loader: require,
   });
-
   global.databases = {
     allContent: bdb.create(path.join(dbDir, "allContent.db")),
     transactions: bdb.create(path.join(dbDir, "transactions.db")),
@@ -37,12 +38,13 @@ const path = require("path");
     pendingBundles: bdb.create(path.join(dbDir, "pendingBundles.db")),
     mempool: bdb.create(path.join(dbDir, "mempool.db")),
   };
-  global.block = 0;
+  global.WsClients = [];
+  global.recentBundle = "";
 
   /*
     Bundles are made every 5 blocks however when the node is syncing it will spam blocks
     (AFAIK bcoin doesnt have a fully synced event that i could get working)
-
+    
     so this is kinda a hacky way to not make bundles when syncing
   */
   global.lastBlockTime = Date.now();
@@ -56,19 +58,26 @@ const path = require("path");
   await global.databases.pendingBundles.open();
   await global.databases.mempool.open();
 
+  let initLoad = require("./sync.js");
+
   await node.open();
   await node.connect();
   node.startSync();
 
+  await initLoad();
+
   // Handles bundle making
   node.chain.on("connect", require("./events/block"));
   node.chain.on("disconnect", require("./events/reorg"));
+
+  await startWeb();
+  await startSocket();
 })();
 
-const start = async () => {
+const startWeb = async () => {
   const server = bweb.server({
-    host:"0.0.0.0",
-    port: global.config.port,
+    host: "0.0.0.0",
+    port: global.config.httpPort,
     sockets: true,
   });
 
@@ -98,4 +107,25 @@ const start = async () => {
     process.exit(1);
   }
 };
-start();
+
+const startSocket = async () => {
+  const server = http.createServer();
+
+  server.on("upgrade", function (request, socket, body) {
+    if (WebSocket.isWebSocket(request)) {
+      let ws = new WebSocket(request, socket, body);
+
+      // Add the new WebSocket to the list of clients
+      global.WsClients.push(ws);
+
+      ws.on("close", function (event) {
+        var index = global.WsClients.indexOf(ws);
+        if (index !== -1) {
+          global.WsClients.splice(index, 1);
+        }
+      });
+    }
+  });
+
+  server.listen(global.config.wsPort);
+};

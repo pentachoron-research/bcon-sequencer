@@ -10,7 +10,7 @@ const bitcoin = require("bitcoinjs-lib");
 
 let sendTx = async () => {
   try {
-    const privateKey = "cPMB77TJ2CgHdv3dfyba5AhUjCeSBrpyGdJcnJZzsAMj85db9HoB";
+    const privateKey = "";
     const address =
       "tb1p0wt007yyzfswhsnwnc45ly9ktyefzyrwznwja0m4gr7n9vjactes80klh4";
 
@@ -43,9 +43,8 @@ let sendTx = async () => {
       headers: { "Content-Type": "text/plain" },
     });
 
-    let txHash = 
-      base58.encode(blake2s.digest(base58.decode(encodedTx),32))
-    
+    let txHash = base58.encode(blake2s.digest(base58.decode(encodedTx), 32));
+
     console.log("Response from sequencer:", response.data);
     console.log("Transaction hash:", txHash);
   } catch (error) {
